@@ -61,7 +61,19 @@ com.umanizales.pagos
 
 - ✅ **Módulo A** (clientes, cuentas): registro/login JWT, perfil, vincular/listar/desvincular cuentas, saldo, movimientos.
 - ✅ **Módulo B** (facturas, servicios): inscribir/listar/editar/eliminar servicios públicos, consultar la factura vigente de cada uno (simulada vía `EmpresaServicioStubGateway` hasta que exista un proveedor real).
-- ⏳ Módulo C (pagos) y Módulo D (reversiones/auditoría): pendientes.
-- ⏳ Frontend React: pendiente.
+- ✅ **Módulo C** (pagos): pago inmediato/parcial/lote, comprobante en JSON y PDF, domiciliación con ejecución batch diaria.
+- ✅ **Módulo D (parte 1)**: solicitud, consulta y aprobación/rechazo de reversiones de pago, con reintegro de fondos.
+- ⏳ Módulo D (parte 2 — historial/filtros/exportación/auditoría) y frontend React: pendientes.
 
 Tanto la integración con el Core Bancario como con las Empresas de Servicio son *stubs* (`CoreBancarioStubGateway`, `EmpresaServicioStubGateway`) que simulan respuestas OK mientras no exista una integración real.
+
+## Rol Administrador (semilla de desarrollo)
+
+Aún no existe un mecanismo para crear administradores (el registro público siempre asigna `CLIENTE`, a propósito). Para poder probar los endpoints que requieren rol `ADMINISTRADOR` (como aprobar/rechazar reversiones), la migración `V7` siembra una cuenta:
+
+```
+email: admin@sistema.local
+password: Admin123!
+```
+
+Es solo para desarrollo/pruebas — cuando el proyecto necesite gestión real de administradores, esto se reemplaza por un mecanismo propio (no auto-registro).

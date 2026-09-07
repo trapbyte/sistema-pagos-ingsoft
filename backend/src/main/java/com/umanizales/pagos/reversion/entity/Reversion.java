@@ -42,4 +42,7 @@ public class Reversion {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EstadoReversion estado;
+
+    @Column(name = "respuesta_administrador")
+    private String respuestaAdministrador;
 }
