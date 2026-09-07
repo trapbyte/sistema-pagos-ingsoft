@@ -11,6 +11,7 @@ import com.umanizales.pagos.pago.dto.RegistrarPagoLoteRequest;
 import com.umanizales.pagos.pago.dto.RegistrarPagoRequest;
 import com.umanizales.pagos.pago.entity.EstadoPago;
 import com.umanizales.pagos.pago.entity.Pago;
+import com.umanizales.pagos.pago.entity.TipoProcesamiento;
 import com.umanizales.pagos.pago.repository.PagoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -202,5 +204,38 @@ class PagoServiceTest {
         Pago pago2 = pagoService.registrarPago(clienteId, new RegistrarPagoRequest(cuentaId, factura2.getId(), null));
 
         assertThat(pago1.getCodigoComprobante()).isNotEqualTo(pago2.getCodigoComprobante());
+    }
+
+    @Test
+    void procesarPagoAutomaticoExitosoCreaUnPagoDomiciliadoYPagaLaFactura() {
+        Cuenta cuenta = cuentaConSaldo("500.00");
+        Factura factura = facturaPendiente("100.00", true);
+        when(pagoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<Pago> resultado = pagoService.procesarPagoAutomatico(cuenta, factura);
+
+        assertThat(resultado).isPresent();
+        assertThat(resultado.get().getEstado()).isEqualTo(EstadoPago.EXITOSO);
+        assertThat(resultado.get().getTipoProcesamiento()).isEqualTo(TipoProcesamiento.DOMICILIADO);
+        assertThat(factura.getEstado()).isEqualTo(EstadoFactura.PAGADA);
+        assertThat(cuenta.getSaldo()).isEqualByComparingTo("400.00");
+    }
+
+    @Test
+    void procesarPagoAutomaticoConSaldoInsuficienteRegistraUnPagoRechazadoSinLanzarExcepcion() {
+        Cuenta cuenta = cuentaConSaldo("10.00");
+        Factura factura = facturaPendiente("100.00", true);
+        when(pagoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<Pago> resultado = pagoService.procesarPagoAutomatico(cuenta, factura);
+
+        assertThat(resultado).isEmpty();
+        assertThat(cuenta.getSaldo()).isEqualByComparingTo("10.00");
+        assertThat(factura.getEstado()).isEqualTo(EstadoFactura.PENDIENTE);
+
+        var pagoCapturado = org.mockito.ArgumentCaptor.forClass(Pago.class);
+        verify(pagoRepository).save(pagoCapturado.capture());
+        assertThat(pagoCapturado.getValue().getEstado()).isEqualTo(EstadoPago.RECHAZADO);
+        assertThat(pagoCapturado.getValue().getTipoProcesamiento()).isEqualTo(TipoProcesamiento.DOMICILIADO);
     }
 }

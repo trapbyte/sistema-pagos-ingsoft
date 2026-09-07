@@ -5,9 +5,13 @@ import com.umanizales.pagos.pago.dto.ComprobanteResponse;
 import com.umanizales.pagos.pago.dto.PagoResponse;
 import com.umanizales.pagos.pago.dto.RegistrarPagoLoteRequest;
 import com.umanizales.pagos.pago.dto.RegistrarPagoRequest;
+import com.umanizales.pagos.pago.service.ComprobantePdfService;
 import com.umanizales.pagos.pago.service.PagoService;
 import jakarta.validation.Valid;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +29,11 @@ import java.util.UUID;
 public class PagoController {
 
     private final PagoService pagoService;
+    private final ComprobantePdfService comprobantePdfService;
 
-    public PagoController(PagoService pagoService) {
+    public PagoController(PagoService pagoService, ComprobantePdfService comprobantePdfService) {
         this.pagoService = pagoService;
+        this.comprobantePdfService = comprobantePdfService;
     }
 
     @PostMapping
@@ -65,5 +71,21 @@ public class PagoController {
         @PathVariable UUID pagoId
     ) {
         return ResponseEntity.ok(pagoService.generarComprobante(user.clienteId(), pagoId));
+    }
+
+    @GetMapping("/{pagoId}/comprobante/pdf")
+    public ResponseEntity<byte[]> comprobantePdf(
+        @AuthenticationPrincipal AuthenticatedUser user,
+        @PathVariable UUID pagoId
+    ) {
+        var comprobante = pagoService.generarComprobante(user.clienteId(), pagoId);
+        byte[] pdf = comprobantePdfService.generar(comprobante);
+
+        String nombreArchivo = "comprobante-" + comprobante.codigoComprobante() + ".pdf";
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                ContentDisposition.attachment().filename(nombreArchivo).build().toString())
+            .body(pdf);
     }
 }

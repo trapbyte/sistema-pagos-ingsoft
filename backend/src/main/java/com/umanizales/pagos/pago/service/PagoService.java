@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -100,6 +101,30 @@ public class PagoService {
             pago.getMonto(),
             pago.getFechaHora()
         );
+    }
+
+    /**
+     * CU-26: intenta el débito automático de una domiciliación. A diferencia de
+     * {@link #ejecutarPago}, no propaga el error de saldo insuficiente (FA01): registra
+     * el intento fallido como {@link EstadoPago#RECHAZADO} y sigue con las demás.
+     */
+    @Transactional
+    public Optional<Pago> procesarPagoAutomatico(Cuenta cuenta, Factura factura) {
+        BigDecimal monto = factura.saldoPendiente();
+        try {
+            return Optional.of(ejecutarPago(cuenta, factura, monto, TipoProcesamiento.DOMICILIADO));
+        } catch (BusinessRuleException ex) {
+            Pago fallido = new Pago();
+            fallido.setCuenta(cuenta);
+            fallido.setFactura(factura);
+            fallido.setCodigoComprobante(generarCodigoComprobante());
+            fallido.setMonto(monto);
+            fallido.setEstado(EstadoPago.RECHAZADO);
+            fallido.setTipoProcesamiento(TipoProcesamiento.DOMICILIADO);
+            fallido.setFechaHora(Instant.now());
+            pagoRepository.save(fallido);
+            return Optional.empty();
+        }
     }
 
     private Factura obtenerFacturaPagable(UUID facturaId) {

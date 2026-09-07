@@ -27,7 +27,16 @@ public class FacturaService {
     @Transactional
     public Factura obtenerFacturaVigente(UUID clienteId, UUID servicioId) {
         ServicioInscrito servicio = servicioInscritoService.obtenerDelCliente(clienteId, servicioId);
+        return obtenerOSincronizar(servicio);
+    }
 
+    /**
+     * Igual que {@link #obtenerFacturaVigente}, pero sin exigir un cliente autenticado —
+     * la usa el batch de domiciliaciones (CU-26), que ya tiene el {@link ServicioInscrito}
+     * resuelto y no actúa en nombre de una sesión de usuario.
+     */
+    @Transactional
+    public Factura obtenerOSincronizar(ServicioInscrito servicio) {
         Factura factura = facturaRepository.findByNumeroReferencia(servicio.getNumeroReferencia())
             .orElseGet(() -> sincronizarNuevaFactura(servicio));
 
