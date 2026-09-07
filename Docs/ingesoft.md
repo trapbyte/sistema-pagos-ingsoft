@@ -82,6 +82,10 @@
   - [3.5. Diagrama de Secuencia — Flujo "Procesar Pago de Servicio Inmediato"](#sec-3-5)
     - [3.5.1 Flujo "Procesar Pago de Servicio Inmediato"](#sec-3-5-1)
     - [3.5.2. Flujo "Ejecución de Domiciliaciones (Proceso Batch)"](#sec-3-5-2)
+- [4. Fase 4: Implementación](#sec-4)
+  - [4.1. Migración de Base de Datos Versionada (Flyway)](#sec-4-1)
+  - [4.2. Entidad y Repositorio (Java / Spring Boot)](#sec-4-2)
+  - [4.3. Cómo ejecutar el proyecto](#sec-4-3)
 
 <div style="page-break-after: always; break-after: page;"></div>
 
@@ -1218,7 +1222,7 @@ graph TB
 <a id="sec-3-3"></a>
 ### 3.3. Diagrama de Clases
 
-A continuación, se presenta el Diagrama de Clases para el Sistema de Pagos de Servicios Públicos. Este diagrama define la estructura estática del sistema al modelar sus entidades principales (Cliente, Cuenta, Factura, Pago, Empresa de Servicios y Reversión), junto con sus atributos, métodos operativos y relaciones de asociación, composición y agregación de la lógica de negocio.
+A continuación, se presenta el Diagrama de Clases para el Sistema de Pagos de Servicios Públicos, actualizado a como quedó implementado en el backend (Java/Spring Boot). Respecto a la versión de diseño inicial, la implementación añadió dos entidades que el modelo original no contemplaba —`ServicioInscrito` (la inscripción de un cliente a una empresa de servicio, con su propio número de referencia y alias) y `Domiciliacion` (el pago automático programado para un servicio inscrito)— porque los casos de uso de inscripción y domiciliación las necesitaban como entidades propias, no como atributos de `Cliente`. También se incorporaron los campos de autenticación (`passwordHash`, `estado`, `rol`) en `Cliente`, preferencias en `Cuenta` (`alias`, `predeterminada`), pago parcial en `Factura` (`montoPagado`), la respuesta del administrador en `Reversion`, y la entidad transversal `AuditLog` para el registro de auditoría (CU-36).
 
 <div style="page-break-inside: avoid; break-inside: avoid;">
 
@@ -1232,22 +1236,35 @@ classDiagram
         +String apellido
         +String email
         +String telefono
+        +String passwordHash
+        +EstadoCliente estado
+        +RolUsuario rol
         +List~Cuenta~ cuentas
-        +vincularCuenta(cuenta) void
-        +desvincularCuenta(cuentaId) void
-        +consultarHistorialPagos() List~Pago~
+    }
+
+    class EstadoCliente {
+        <<enumeration>>
+        ACTIVO
+        INACTIVO
+    }
+
+    class RolUsuario {
+        <<enumeration>>
+        CLIENTE
+        ADMINISTRADOR
     }
 
     class Cuenta {
         +UUID id
         +String numeroCuenta
         +TipoCuenta tipo
-        +Decimal saldo
+        +BigDecimal saldo
         +EstadoCuenta estado
+        +String alias
+        +boolean predeterminada
         +Cliente cliente
-        +List~Pago~ pagos
-        +validarSaldo(monto) Boolean
-        +debitar(monto) Boolean
+        +validarSaldo(monto) boolean
+        +debitar(monto) void
         +acreditar(monto) void
     }
 
@@ -1270,22 +1287,29 @@ classDiagram
         +String razonSocial
         +String categoria
         +String endpointApi
-        +List~Factura~ facturas
-        +consultarFactura(referencia) Factura
-        +notificarPago(pago) Boolean
+        +boolean permitePagoParcial
+    }
+
+    class ServicioInscrito {
+        +UUID id
+        +String numeroReferencia
+        +String alias
+        +Cliente cliente
+        +EmpresaServicio empresa
     }
 
     class Factura {
         +UUID id
         +String numeroReferencia
-        +Decimal montoTotal
-        +Date fechaEmision
-        +Date fechaVencimiento
+        +BigDecimal montoTotal
+        +BigDecimal montoPagado
+        +LocalDate fechaEmision
+        +LocalDate fechaVencimiento
         +EstadoFactura estado
         +EmpresaServicio empresa
-        +Pago pago
-        +esVencida() Boolean
-        +marcarComoPagada() void
+        +saldoPendiente() BigDecimal
+        +esVencida() boolean
+        +marcarComoPagada(monto) void
     }
 
     class EstadoFactura {
@@ -1299,15 +1323,12 @@ classDiagram
     class Pago {
         +UUID id
         +String codigoComprobante
-        +Decimal monto
-        +DateTime fechaHora
+        +BigDecimal monto
+        +Instant fechaHora
         +EstadoPago estado
         +TipoProcesamiento tipoProcesamiento
         +Cuenta cuenta
         +Factura factura
-        +Reversion reversion
-        +procesarPago() Boolean
-        +generarComprobante() String
     }
 
     class EstadoPago {
@@ -1324,14 +1345,26 @@ classDiagram
         DOMICILIADO
     }
 
+    class Domiciliacion {
+        +UUID id
+        +EstadoDomiciliacion estado
+        +ServicioInscrito servicioInscrito
+        +Cuenta cuenta
+    }
+
+    class EstadoDomiciliacion {
+        <<enumeration>>
+        ACTIVA
+        INACTIVA
+    }
+
     class Reversion {
         +UUID id
-        +DateTime fechaSolicitud
+        +Instant fechaSolicitud
         +String motivo
         +EstadoReversion estado
+        +String respuestaAdministrador
         +Pago pago
-        +aprobarReversion() void
-        +rechazarReversion(motivo) void
     }
 
     class EstadoReversion {
@@ -1342,24 +1375,41 @@ classDiagram
         EJECUTADA
     }
 
+    class AuditLog {
+        +UUID id
+        +Instant fechaHora
+        +UUID usuarioId
+        +String direccionIp
+        +String accion
+        +String entidadTipo
+        +UUID entidadId
+        +String detalle
+    }
+
     Cliente "1" --> "0..*" Cuenta : posee
+    Cliente --> EstadoCliente : tiene
+    Cliente --> RolUsuario : tiene
     Cuenta --> TipoCuenta : es_de_tipo
     Cuenta --> EstadoCuenta : tiene
-    Cliente "1" --> "0..*" Pago : realiza
     Cuenta "1" --> "0..*" Pago : debita_de
+    Cliente "1" --> "0..*" ServicioInscrito : inscribe
+    EmpresaServicio "1" --> "0..*" ServicioInscrito : es_provista_por
     EmpresaServicio "1" --> "0..*" Factura : emite
-    Factura "1" --> "0..1" Pago : cancela
     Factura --> EstadoFactura : tiene
+    Factura "1" --> "0..*" Pago : cancela
     Pago --> EstadoPago : presenta
     Pago --> TipoProcesamiento : ejecuta_via
     Pago "1" --> "0..1" Reversion : solicita
     Reversion --> EstadoReversion : se_encuentra_en
+    ServicioInscrito "1" --> "0..1" Domiciliacion : programa
+    Cuenta "1" --> "0..*" Domiciliacion : debita_de
+    Domiciliacion --> EstadoDomiciliacion : tiene
 ```
 
 <a id="sec-3-4"></a>
 ### 3.4. Diagrama Entidad-Relación (ER)
 
-A continuación, se presenta el Diagrama Entidad-Relación para el Sistema de Pagos de Servicios Públicos. Este define la estructura del modelo físico de datos relacional para PostgreSQL, detallando las tablas, llaves primarias (PK), llaves foráneas (FK), restricciones de unicidad (UK), tipos de datos y la cardinalidad de las relaciones que garantizan la integridad referencial del sistema.
+A continuación, se presenta el Diagrama Entidad-Relación para el Sistema de Pagos de Servicios Públicos, actualizado al esquema final construido con las migraciones versionadas de Flyway (`V1` a `V8`, ver sección 4.1). Respecto al diseño inicial se agregaron `SERVICIO_INSCRITO` (la inscripción de un cliente a una empresa, con su propio número de referencia — necesaria porque un mismo cliente puede tener varias inscripciones con la misma empresa) y se corrigió `DOMICILIACION` para que apunte al servicio inscrito en vez de a cliente/empresa por separado, y `AUDITORIA` para reflejar los campos que realmente pide CU-36 (usuario opcional, dirección IP, tipo y id de la entidad afectada).
 
 <div style="page-break-inside: avoid; break-inside: avoid;">
 
@@ -1373,6 +1423,9 @@ erDiagram
         varchar apellido
         varchar email UK
         varchar telefono
+        varchar password_hash
+        varchar estado
+        varchar rol
         timestamp created_at
     }
 
@@ -1383,6 +1436,8 @@ erDiagram
         varchar tipo
         numeric saldo
         varchar estado
+        varchar alias
+        boolean es_predeterminada
         timestamp created_at
     }
 
@@ -1392,6 +1447,16 @@ erDiagram
         varchar razon_social
         varchar categoria
         varchar endpoint_api
+        boolean permite_pago_parcial
+        timestamp created_at
+    }
+
+    SERVICIO_INSCRITO {
+        uuid id PK
+        uuid cliente_id FK
+        uuid empresa_id FK
+        varchar numero_referencia
+        varchar alias
         timestamp created_at
     }
 
@@ -1400,6 +1465,7 @@ erDiagram
         uuid empresa_id FK
         varchar numero_referencia UK
         numeric monto_total
+        numeric monto_pagado
         date fecha_emision
         date fecha_vencimiento
         varchar estado
@@ -1419,42 +1485,50 @@ erDiagram
 
     REVERSION {
         uuid id PK
-        uuid pago_id FK
+        uuid pago_id FK UK
         text motivo
         varchar estado
+        varchar respuesta_administrador
         timestamp fecha_solicitud
-        timestamp updated_at
     }
 
     DOMICILIACION {
         uuid id PK
-        uuid cliente_id FK
+        uuid servicio_inscrito_id FK UK
         uuid cuenta_id FK
-        uuid empresa_id FK
-        numeric limite_monto
-        boolean activa
+        varchar estado
         timestamp created_at
     }
 
-    AUDITORIA_LOG {
+    AUDITORIA {
         uuid id PK
-        uuid cliente_id FK
+        uuid usuario_id FK
+        varchar direccion_ip
         varchar accion
-        varchar entidad
-        text detalle
-        timestamp fecha_registro
+        varchar entidad_tipo
+        uuid entidad_id
+        varchar detalle
+        timestamp fecha_hora
     }
 
     CLIENTE          ||--o{ CUENTA : "posee"
-    CLIENTE          ||--o{ DOMICILIACION : "configura"
-    CLIENTE          ||--o{ AUDITORIA_LOG : "genera"
+    CLIENTE          ||--o{ SERVICIO_INSCRITO : "inscribe"
+    CLIENTE          |o--o{ AUDITORIA : "genera"
     CUENTA           ||--o{ PAGO : "debita_de"
-    CUENTA           ||--o{ DOMICILIACION : "asigna"
+    CUENTA           ||--o{ DOMICILIACION : "debita_de"
+    EMPRESA_SERVICIO ||--o{ SERVICIO_INSCRITO : "es_provista_por"
     EMPRESA_SERVICIO ||--o{ FACTURA : "emite"
-    EMPRESA_SERVICIO ||--o{ DOMICILIACION : "recibe"
-    FACTURA          ||--o| PAGO : "cancela"
+    SERVICIO_INSCRITO ||--o| DOMICILIACION : "programa"
+    FACTURA          ||--o{ PAGO : "cancela"
     PAGO             ||--o| REVERSION : "solicita"
 ```
+
+`SERVICIO_INSCRITO` y `FACTURA` no tienen una llave foránea entre sí: la factura vigente de
+un servicio se resuelve en tiempo de ejecución haciendo *match* por `numero_referencia`
+contra la respuesta de la Empresa de Servicio (real o, hoy, su *stub* — ver sección
+3.1.2), y se cachea localmente creando/actualizando la fila de `FACTURA` correspondiente.
+Es una decisión deliberada: la factura "pertenece" conceptualmente a la empresa, no al
+cliente que se inscribió a ella.
 
 <a id="sec-3-5"></a>
 ### 3.5. Diagrama de Secuencia — Flujo "Procesar Pago de Servicio Inmediato"
@@ -1746,3 +1820,305 @@ sequenceDiagram
         end
     end
 ```
+<div style="page-break-after: always; break-after: page;"></div>
+
+---
+
+<a id="sec-4"></a>
+## 4. Fase 4: Implementación
+
+Con el diseño de arquitectura (Fase 2) ya validado contra los casos de uso, esta fase
+documenta cómo se construyó realmente el sistema: la estrategia de migración de base de
+datos versionada y el patrón de código (entidad + repositorio) que se repite en los
+cuatro módulos del backend. El código completo vive en `backend/` y `frontend/`; aquí se
+explica el *cómo*, con un ejemplo representativo de cada pieza en vez de transcribir las
+~20 entidades y repositorios del proyecto.
+
+<a id="sec-4-1"></a>
+### 4.1. Migración de Base de Datos Versionada (Flyway)
+
+El esquema de PostgreSQL no se creó a mano ni se generó automáticamente desde las
+entidades JPA (`ddl-auto: validate`, nunca `update` ni `create`): cada cambio de esquema
+es un script SQL versionado que **Flyway** aplica en orden y de forma acumulativa contra
+Supabase al arrancar el backend. Esto es lo que pidió el profesor para esta fase, y es
+además el enfoque real que se usó durante todo el desarrollo: cada módulo agregó su
+propia migración en vez de reescribir un único script.
+
+**Convención de nombres**: `V<versión>__<descripción>.sql`, en
+`backend/src/main/resources/db/migration/`. Flyway lleva el registro de qué versiones ya
+se aplicaron en la tabla `flyway_schema_history`; un script una vez aplicado no se
+vuelve a modificar — cualquier corrección se hace en una migración nueva.
+
+| Migración | Contenido |
+|---|---|
+| `V1__init_schema.sql` | Esquema base de los 4 módulos: `cliente`, `cuenta`, `empresa_servicio`, `factura`, `pago`, `reversion`. |
+| `V2__cliente_auth_and_cuenta_preferencias.sql` | Autenticación: `password_hash`, `estado`, `rol` en `cliente`; `alias`/`es_predeterminada` en `cuenta`. |
+| `V3__servicio_inscrito.sql` | Tabla `servicio_inscrito` (inscripción cliente↔empresa), no contemplada en el diseño original. |
+| `V4__empresas_servicio_semilla.sql` | Datos semilla de empresas de servicio para poder probar el flujo end-to-end. |
+| `V5__pagos_parciales.sql` | `monto_pagado` en `factura` y `permite_pago_parcial` en `empresa_servicio` (CU-21). |
+| `V6__domiciliacion.sql` | Tabla `domiciliacion` (pago automático programado). |
+| `V7__reversiones_y_admin.sql` | `respuesta_administrador` en `reversion`; cuenta semilla con rol `ADMINISTRADOR`. |
+| `V8__auditoria.sql` | Tabla `auditoria` (CU-36). |
+
+A continuación, la migración base (`V1`) como ejemplo del enfoque: cada tabla declara sus
+llaves primarias y foráneas, restricciones `UNIQUE` para las reglas de negocio que exigen
+unicidad (documento, correo, número de cuenta, número de factura, código de
+comprobante), `CHECK` para los valores válidos de cada enumeración de estado, e índices
+sobre las llaves foráneas más consultadas.
+
+```sql
+-- V1__init_schema.sql — Módulo A: Clientes y Cuentas Bancarias
+
+CREATE TABLE cliente (
+    id                  UUID PRIMARY KEY,
+    documento_identidad VARCHAR(30)  NOT NULL,
+    tipo_documento      VARCHAR(20)  NOT NULL,
+    nombre              VARCHAR(100) NOT NULL,
+    apellido            VARCHAR(100) NOT NULL,
+    email               VARCHAR(150) NOT NULL,
+    telefono            VARCHAR(30),
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT uk_cliente_documento UNIQUE (documento_identidad),
+    CONSTRAINT uk_cliente_email UNIQUE (email)
+);
+
+CREATE TABLE cuenta (
+    id            UUID PRIMARY KEY,
+    cliente_id    UUID          NOT NULL REFERENCES cliente (id) ON DELETE RESTRICT,
+    numero_cuenta VARCHAR(34)   NOT NULL,
+    tipo          VARCHAR(20)   NOT NULL,
+    saldo         NUMERIC(18,2) NOT NULL DEFAULT 0,
+    estado        VARCHAR(20)   NOT NULL,
+    created_at    TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT uk_cuenta_numero UNIQUE (numero_cuenta),
+    CONSTRAINT ck_cuenta_tipo CHECK (tipo IN ('AHORROS', 'CORRIENTE')),
+    CONSTRAINT ck_cuenta_estado CHECK (estado IN ('ACTIVA', 'INACTIVA', 'BLOQUEADA'))
+);
+
+CREATE INDEX idx_cuenta_cliente_id ON cuenta (cliente_id);
+
+-- Módulo B: Facturas y Servicios
+
+CREATE TABLE empresa_servicio (
+    id           UUID PRIMARY KEY,
+    nit          VARCHAR(30)  NOT NULL,
+    razon_social VARCHAR(150) NOT NULL,
+    categoria    VARCHAR(50)  NOT NULL,
+    endpoint_api VARCHAR(255),
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT uk_empresa_nit UNIQUE (nit)
+);
+
+CREATE TABLE factura (
+    id                 UUID PRIMARY KEY,
+    empresa_id         UUID          NOT NULL REFERENCES empresa_servicio (id) ON DELETE RESTRICT,
+    numero_referencia  VARCHAR(60)   NOT NULL,
+    monto_total        NUMERIC(18,2) NOT NULL,
+    fecha_emision      DATE          NOT NULL,
+    fecha_vencimiento  DATE          NOT NULL,
+    estado             VARCHAR(20)   NOT NULL,
+    created_at         TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT uk_factura_referencia UNIQUE (numero_referencia),
+    CONSTRAINT ck_factura_estado CHECK (estado IN ('PENDIENTE', 'PAGADA', 'VENCIDA', 'ANULADA'))
+);
+
+CREATE INDEX idx_factura_empresa_id ON factura (empresa_id);
+
+-- Módulo C: Procesamiento de Pagos
+
+CREATE TABLE pago (
+    id                  UUID PRIMARY KEY,
+    cuenta_id           UUID          NOT NULL REFERENCES cuenta (id) ON DELETE RESTRICT,
+    factura_id          UUID          NOT NULL REFERENCES factura (id) ON DELETE RESTRICT,
+    codigo_comprobante  VARCHAR(60)   NOT NULL,
+    monto               NUMERIC(18,2) NOT NULL,
+    estado              VARCHAR(20)   NOT NULL,
+    tipo_procesamiento  VARCHAR(20)   NOT NULL,
+    fecha_hora          TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT uk_pago_comprobante UNIQUE (codigo_comprobante),
+    CONSTRAINT ck_pago_estado CHECK (estado IN ('PROCESANDO', 'EXITOSO', 'RECHAZADO', 'REVERSADO')),
+    CONSTRAINT ck_pago_tipo_procesamiento CHECK (tipo_procesamiento IN ('MANUAL', 'DOMICILIADO'))
+);
+
+CREATE INDEX idx_pago_cuenta_id ON pago (cuenta_id);
+CREATE INDEX idx_pago_factura_id ON pago (factura_id);
+
+-- Módulo D: Operaciones Avanzadas y Soporte
+
+CREATE TABLE reversion (
+    id               UUID PRIMARY KEY,
+    pago_id          UUID        NOT NULL REFERENCES pago (id) ON DELETE RESTRICT,
+    fecha_solicitud  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    motivo           VARCHAR(500) NOT NULL,
+    estado           VARCHAR(20) NOT NULL,
+    CONSTRAINT uk_reversion_pago UNIQUE (pago_id),
+    CONSTRAINT ck_reversion_estado CHECK (estado IN ('SOLICITADA', 'APROBADA', 'RECHAZADA', 'EJECUTADA'))
+);
+```
+
+Como ejemplo de una migración posterior más pequeña —el patrón que se repitió en `V2`
+a `V8`, agregando estructura sin reescribir lo ya aplicado—, así se agregó la tabla de
+auditoría (CU-36) en `V8__auditoria.sql`:
+
+```sql
+CREATE TABLE auditoria (
+    id            UUID PRIMARY KEY,
+    fecha_hora    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    usuario_id    UUID REFERENCES cliente (id) ON DELETE SET NULL,
+    direccion_ip  VARCHAR(45),
+    accion        VARCHAR(100) NOT NULL,
+    entidad_tipo  VARCHAR(50),
+    entidad_id    UUID,
+    detalle       VARCHAR(1000)
+);
+
+CREATE INDEX idx_auditoria_usuario_id ON auditoria (usuario_id);
+CREATE INDEX idx_auditoria_fecha_hora ON auditoria (fecha_hora);
+```
+
+`usuario_id` es nulable a propósito: el proceso batch de domiciliaciones (sección 3.5.2)
+genera eventos de auditoría sin que haya un usuario autenticado detrás.
+
+<a id="sec-4-2"></a>
+### 4.2. Entidad y Repositorio (Java / Spring Boot)
+
+El backend está organizado **por módulo de dominio y no por capa técnica**: en vez de
+carpetas globales `entities/`, `repositories/`, `services/`, cada módulo (`cliente`,
+`factura`, `pago`, `reversion`, `auditoria`) tiene sus propias carpetas
+`entity/ dto/ repository/ service/ controller/`. Esto mantiene junto todo lo que cambia
+junto cuando se modifica un caso de uso, en línea con los límites de los Módulos A-D
+definidos desde la Fase 1.
+
+Como ejemplo representativo del patrón —igual al que siguen el resto de entidades del
+proyecto— se muestra `Cuenta` (Módulo A), porque además de mapear la tabla `cuenta`
+concentra la lógica de negocio del saldo (CU-20/21/22) directamente en la entidad, en
+vez de dejarla dispersa en el servicio:
+
+```java
+// backend/src/main/java/com/umanizales/pagos/cliente/entity/Cuenta.java
+@Entity
+@Table(name = "cuenta")
+@Getter
+@Setter
+@NoArgsConstructor
+public class Cuenta extends Auditable {
+
+    @Id
+    @GeneratedValue
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "cliente_id", nullable = false)
+    private Cliente cliente;
+
+    @Column(name = "numero_cuenta", nullable = false, unique = true)
+    private String numeroCuenta;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TipoCuenta tipo;
+
+    @Column(nullable = false)
+    private BigDecimal saldo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private EstadoCuenta estado;
+
+    private String alias;
+
+    @Column(name = "es_predeterminada", nullable = false)
+    private boolean predeterminada;
+
+    public boolean validarSaldo(BigDecimal monto) {
+        return saldo.compareTo(monto) >= 0;
+    }
+
+    // CU-20/21/22: descuenta fondos de la cuenta. Lanza BusinessRuleException
+    // si el saldo no alcanza (regla de negocio de esos casos de uso).
+    public void debitar(BigDecimal monto) {
+        if (!validarSaldo(monto)) {
+            throw new BusinessRuleException("Saldo insuficiente en la cuenta " + numeroCuenta);
+        }
+        this.saldo = this.saldo.subtract(monto);
+    }
+
+    public void acreditar(BigDecimal monto) {
+        this.saldo = this.saldo.add(monto);
+    }
+}
+```
+
+`Auditable` es la superclase mapeada (`@MappedSuperclass`) que comparten todas las
+entidades con marca de tiempo de creación, usando el módulo de auditoría de Spring Data:
+
+```java
+// backend/src/main/java/com/umanizales/pagos/common/Auditable.java
+@MappedSuperclass
+@EntityListeners(AuditingEntityListener.class)
+public abstract class Auditable {
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+}
+```
+
+El repositorio sigue el patrón estándar de Spring Data JPA: extender `JpaRepository` y
+declarar únicamente los métodos de consulta que el servicio necesita, dejando que Spring
+genere la implementación a partir del nombre del método:
+
+```java
+// backend/src/main/java/com/umanizales/pagos/cliente/repository/CuentaRepository.java
+public interface CuentaRepository extends JpaRepository<Cuenta, UUID> {
+
+    List<Cuenta> findByClienteId(UUID clienteId);
+
+    Optional<Cuenta> findByIdAndClienteId(UUID id, UUID clienteId);
+
+    boolean existsByNumeroCuenta(String numeroCuenta);
+
+    boolean existsByClienteId(UUID clienteId);
+
+    long countByClienteIdAndPredeterminadaTrue(UUID clienteId);
+}
+```
+
+`findByIdAndClienteId` no es un detalle menor: es el patrón que se repite en **todos**
+los repositorios del proyecto para evitar IDOR (Insecure Direct Object Reference) — un
+cliente nunca consulta una entidad por su `id` a secas, siempre junto con su propio
+`clienteId` (directo o a través de la cadena `cuenta → cliente`), de modo que no pueda
+acceder a datos de otro cliente adivinando un UUID.
+
+Ese mismo patrón (entidad con `@Entity`/Lombok + repositorio `JpaRepository` con
+consultas derivadas, y `@Query` con `JOIN FETCH` cuando hace falta traer una asociación
+`LAZY` sin una segunda consulta) se repite en el resto de entidades del proyecto:
+
+| Entidad | Módulo | Repositorio | Particularidad |
+|---|---|---|---|
+| `Cliente` | A | `ClienteRepository` | `existsByEmail`, `existsByDocumentoIdentidad`, `findByEmail` (login). |
+| `Cuenta` | A | `CuentaRepository` | Mostrado arriba. |
+| `EmpresaServicio` | B | `EmpresaServicioRepository` | Solo lectura (CU-11), sin gestión propia todavía. |
+| `ServicioInscrito` | B | `ServicioInscritoRepository` | `@Query` con `JOIN FETCH s.empresa` para evitar `LazyInitializationException`. |
+| `Factura` | B | `FacturaRepository` | `findByNumeroReferencia` (sincronización con la Empresa de Servicio). |
+| `Pago` | C | `PagoRepository` | Además de `JpaRepository`, extiende `JpaSpecificationExecutor<Pago>` para los filtros combinables del historial (CU-33/34). |
+| `Domiciliacion` | C | `DomiciliacionRepository` | `findByEstado` con `JOIN FETCH` de dos niveles (`servicioInscrito.empresa`) para el batch diario. |
+| `Reversion` | D | `ReversionRepository` | `existsByPagoId` (una sola reversión por pago) y variantes `JOIN FETCH r.pago` según el rol de quien consulta. |
+| `AuditLog` | D (transversal) | `AuditLogRepository` | Consultas derivadas por `accion`/`usuarioId` para el panel de auditoría (solo Administrador). |
+
+<a id="sec-4-3"></a>
+### 4.3. Cómo ejecutar el proyecto
+
+Las instrucciones completas de instalación, variables de entorno y verificación están en
+el [`README.md`](../README.md) de la raíz del repositorio, con el detalle específico del
+backend en [`backend/README.md`](../backend/README.md) y del frontend en
+[`frontend/README.md`](../frontend/README.md). En resumen: `mvn spring-boot:run` en
+`backend/` (aplica las migraciones de Flyway automáticamente contra PostgreSQL) y
+`npm run dev` en `frontend/`. El sistema expone dos roles —`CLIENTE` (autoregistro) y
+`ADMINISTRADOR` (cuenta de desarrollo sembrada por `V7`, ver README raíz)— y todas las
+funcionalidades de los Módulos A-D descritas en la sección 1 están implementadas y
+verificadas de punta a punta contra una base de datos real.
