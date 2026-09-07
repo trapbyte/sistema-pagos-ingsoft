@@ -66,7 +66,7 @@ Los cuatro módulos del documento de especificación están implementados en el 
 - ✅ **Módulo B** (facturas, servicios): inscribir/listar/editar/eliminar servicios públicos, consultar la factura vigente de cada uno (simulada vía `EmpresaServicioStubGateway` hasta que exista un proveedor real).
 - ✅ **Módulo C** (pagos): pago inmediato/parcial/lote, comprobante en JSON y PDF, domiciliación con ejecución batch diaria.
 - ✅ **Módulo D**: solicitud/aprobación/rechazo de reversiones con reintegro de fondos, historial consolidado con filtros combinables, exportación a CSV y auditoría de operaciones críticas (login, pagos, reversiones).
-- ⏳ Frontend React: pendiente — es el siguiente bloque de trabajo.
+- ✅ **Frontend React**: SPA mobile-first en `../frontend` que cubre las pantallas de los 4 módulos (ver `../frontend/README.md`).
 
 Tanto la integración con el Core Bancario como con las Empresas de Servicio son *stubs* (`CoreBancarioStubGateway`, `EmpresaServicioStubGateway`) que simulan respuestas OK mientras no exista una integración real.
 

@@ -1,0 +1,89 @@
+.header {
+  padding: var(--space-6) 0 var(--space-4);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.cuentaCard {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-card);
+}
+
+.cuentaInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.cuentaTitle {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cuentaMeta {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.star {
+  background: none;
+  border: none;
+  color: var(--line);
+  padding: 4px;
+}
+
+.star.active {
+  color: var(--copper);
+}
+
+.linkList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.linkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.linkRow:hover {
+  border-color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.dangerZone {
+  border: 1px dashed var(--danger);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}

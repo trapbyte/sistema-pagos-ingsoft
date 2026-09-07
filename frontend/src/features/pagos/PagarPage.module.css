@@ -1,0 +1,99 @@
+.header {
+  padding: var(--space-6) 0 var(--space-4);
+}
+
+.cuentaPicker {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.cuentaChip {
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  min-width: 168px;
+  text-align: left;
+}
+
+.cuentaChip.active {
+  border-color: var(--teal);
+  background: var(--teal-tint);
+  box-shadow: 0 0 0 1px var(--teal);
+}
+
+.cuentaChipTitle {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.cuentaChipMeta {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+
+.checkbox {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--teal);
+  flex-shrink: 0;
+}
+
+.summaryBar {
+  position: sticky;
+  bottom: calc(var(--nav-height) + var(--space-4));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-pop);
+  margin-top: var(--space-5);
+}
+
+.comprobante {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: center;
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+}
+
+.comprobanteAmount {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 600;
+}
+
+.comprobanteMeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
