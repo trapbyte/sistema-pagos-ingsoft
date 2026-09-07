@@ -9,3 +9,7 @@ backend/.env
 
 # OS
 .DS_Store
+
+# Tooling de Claude Code (config/skills personales, no parte del proyecto)
+.claude/skills/
+skills-lock.json
