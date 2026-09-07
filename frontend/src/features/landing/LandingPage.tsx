@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CreditCard,
   Droplet,
+  Flame,
   History,
   Link2,
   Receipt,
@@ -80,11 +81,11 @@ export function LandingPage() {
 
       <section className={styles.hero}>
         <div className={`${styles.heroCopy} ${styles.in}`}>
-          <span className={styles.eyebrowless}>Servicios públicos, un solo lugar</span>
+          <span className={styles.eyebrowless}>Agua, luz, gas e internet — un solo lugar</span>
           <h1 className={styles.headline}>Todas tus facturas, pagadas antes de que las olvides</h1>
           <p className={styles.subhead}>
-            Vincula tus cuentas, inscribe agua, luz, gas e internet, y paga cada factura —o actívalas para que se
-            paguen solas— desde un mismo lugar, con comprobante al instante.
+            Vincula tu cuenta, inscribe cada servicio y paga en segundos —o déjalos domiciliados y olvídate de las
+            fechas—. Un comprobante te espera cada vez.
           </p>
           <div className={styles.heroActions}>
             <Button variant="copper" as={Link} to="/registrarse">
@@ -98,7 +99,7 @@ export function LandingPage() {
         </div>
 
         <div className={`${styles.heroVisual} ${styles.in}`}>
-          <PhoneMockup />
+          <HeroVisual />
         </div>
       </section>
 
@@ -171,37 +172,72 @@ function Reveal({ children }: { children: ReactNode }) {
   );
 }
 
-function PhoneMockup() {
-  const facturas = [
-    { icon: Droplet, accent: "var(--servicio-agua)", title: "Aguas de Manizales", meta: "Vence en 3 días", amount: "$ 62.400" },
-    { icon: Zap, accent: "var(--servicio-energia)", title: "CHEC", meta: "Vence en 6 días", amount: "$ 138.500" },
-    { icon: Wifi, accent: "var(--servicio-internet)", title: "Internet hogar", meta: "Vence en 12 días", amount: "$ 89.900" },
-  ];
+interface Chip {
+  icon: typeof Droplet;
+  accent: string;
+  top: number;
+  left: number;
+  size: number;
+  rotate: number;
+  delay: number;
+}
+
+const CENTER: Chip = { icon: CreditCard, accent: "var(--teal)", top: 50, left: 50, size: 30, rotate: 0, delay: 0 };
+
+const SATELITES: Chip[] = [
+  { icon: Droplet, accent: "var(--servicio-agua)", top: 16, left: 20, size: 21, rotate: -8, delay: 120 },
+  { icon: Zap, accent: "var(--servicio-energia)", top: 12, left: 76, size: 19, rotate: 10, delay: 200 },
+  { icon: Flame, accent: "var(--servicio-gas)", top: 80, left: 18, size: 19, rotate: 7, delay: 280 },
+  { icon: Wifi, accent: "var(--servicio-internet)", top: 84, left: 74, size: 21, rotate: -9, delay: 360 },
+];
+
+/**
+ * Composición visual del hero: en vez de una foto o una maqueta de pantalla, un
+ * conjunto de "chips" flotantes con los íconos de cada servicio conectados a un centro
+ * de pago — la idea de "todo en un solo lugar" hecha forma, sobre un fondo con
+ * profundidad (dos manchas de color difuminadas + una grilla de puntos sutil).
+ */
+function HeroVisual() {
+  const todos = [CENTER, ...SATELITES];
 
   return (
-    <div className={styles.phone}>
-      <div className={styles.phoneScreen}>
-        <div className={styles.phoneStatus}>
-          <span>9:41</span>
-          <span>●●●●</span>
-        </div>
-        <div className={styles.phoneBalance}>
-          <span className={styles.phoneBalanceLabel}>Saldo disponible</span>
-          <span className={`${styles.phoneBalanceValue} money`}>$ 1.245.300</span>
-        </div>
-        {facturas.map((f) => (
-          <div key={f.title} className={styles.phoneStub} style={{ ["--stub-accent" as string]: f.accent }}>
-            <span className={styles.phoneStubIcon}>
-              <f.icon size={15} />
-            </span>
-            <div className={styles.phoneStubBody}>
-              <span className={styles.phoneStubTitle}>{f.title}</span>
-              <span className={styles.phoneStubMeta}>{f.meta}</span>
-            </div>
-            <span className={`${styles.phoneStubAmount} money`}>{f.amount}</span>
-          </div>
+    <div className={styles.stage}>
+      <div className={styles.stageGlowA} aria-hidden />
+      <div className={styles.stageGlowB} aria-hidden />
+      <div className={styles.stageDots} aria-hidden />
+
+      <svg className={styles.stageLines} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+        {SATELITES.map((s) => (
+          <line
+            key={`${s.top}-${s.left}`}
+            x1={CENTER.left}
+            y1={CENTER.top}
+            x2={s.left}
+            y2={s.top}
+            stroke={s.accent}
+            strokeWidth={0.4}
+            strokeDasharray="2 2.5"
+            opacity={0.45}
+          />
         ))}
-      </div>
+      </svg>
+
+      {todos.map((chip, i) => (
+        <span
+          key={i}
+          className={i === 0 ? `${styles.chip} ${styles.chipCenter}` : styles.chip}
+          style={{
+            top: `${chip.top}%`,
+            left: `${chip.left}%`,
+            width: `${chip.size}%`,
+            ["--chip-accent" as string]: chip.accent,
+            ["--chip-rotate" as string]: `${chip.rotate}deg`,
+            ["--chip-delay" as string]: `${chip.delay}ms`,
+          }}
+        >
+          <chip.icon size={i === 0 ? 26 : 18} strokeWidth={1.8} />
+        </span>
+      ))}
     </div>
   );
 }

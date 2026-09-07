@@ -121,7 +121,6 @@
 
 .heroVisual.in {
   animation: settle-in var(--duration-settle) var(--ease-settle) forwards;
-  animation-delay: 160ms;
 }
 
 @media (min-width: 900px) {
@@ -131,94 +130,80 @@
   }
 }
 
-/* --- phone mockup --- */
-.phone {
-  width: min(300px, 78vw);
-  border-radius: 34px;
-  background: var(--ink);
-  padding: 10px;
-  box-shadow: var(--shadow-pop);
+/* --- composición visual del hero: chips flotantes + fondo con profundidad --- */
+.stage {
+  position: relative;
+  width: min(400px, 88vw);
+  aspect-ratio: 1;
 }
 
-.phoneScreen {
-  background: var(--paper);
-  border-radius: 26px;
-  overflow: hidden;
-  padding: var(--space-4) var(--space-3) var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+.stageGlowA,
+.stageGlowB {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(46px);
+  opacity: 0.55;
+  z-index: 0;
 }
 
-.phoneStatus {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.7rem;
-  color: var(--ink-soft);
-  padding: 0 var(--space-1);
+.stageGlowA {
+  width: 62%;
+  height: 62%;
+  top: -6%;
+  left: -8%;
+  background: var(--teal);
 }
 
-.phoneBalance {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 var(--space-1);
+.stageGlowB {
+  width: 56%;
+  height: 56%;
+  bottom: -8%;
+  right: -6%;
+  background: var(--copper);
+  opacity: 0.4;
 }
 
-.phoneBalanceLabel {
-  font-size: 0.7rem;
-  color: var(--ink-soft);
+.stageDots {
+  position: absolute;
+  inset: 8%;
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 30%, transparent) 1.4px, transparent 1.4px);
+  background-size: 18px 18px;
+  opacity: 0.35;
+  border-radius: var(--radius-lg);
+  mask-image: radial-gradient(circle at center, black 55%, transparent 78%);
 }
 
-.phoneBalanceValue {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-  font-weight: 600;
+.stageLines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
 }
 
-.phoneStub {
+.chip {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) rotate(var(--chip-rotate, 0deg));
+  border-radius: 22%;
   background: var(--surface);
-  border-radius: var(--radius-md);
   border: 1px solid var(--line-soft);
-  border-left: 3px solid var(--stub-accent, var(--teal));
-  padding: var(--space-3);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  box-shadow: var(--shadow-card);
-}
-
-.phoneStubIcon {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  color: var(--chip-accent, var(--teal));
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--stub-accent, var(--teal)) 15%, transparent);
-  color: var(--stub-accent, var(--teal));
-  flex-shrink: 0;
+  box-shadow: var(--shadow-pop);
+  z-index: 2;
+  opacity: 0;
+  animation: settle-in var(--duration-settle) var(--ease-settle) forwards;
+  animation-delay: var(--chip-delay, 0ms);
 }
 
-.phoneStubBody {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.phoneStubTitle {
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-.phoneStubMeta {
-  font-size: 0.72rem;
-  color: var(--ink-soft);
-}
-
-.phoneStubAmount {
-  font-size: 0.82rem;
-  font-weight: 700;
+.chipCenter {
+  z-index: 3;
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  box-shadow: 0 16px 34px -10px color-mix(in srgb, var(--teal) 55%, transparent);
 }
 
 /* --- secciones reveal --- */
