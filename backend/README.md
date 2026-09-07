@@ -13,7 +13,8 @@ Backend en **Java 21 + Spring Boot 3** para el proyecto de Ingeniería de Softwa
 
 1. Crea una cuenta gratuita en [supabase.com](https://supabase.com) y un nuevo proyecto (elige una región cercana, ej. `us-east-1` o `sa-east-1`).
 2. Guarda la contraseña de la base de datos que te pide al crear el proyecto (o resetéala luego en **Project Settings > Database**).
-3. Ve a **Project Settings > Database > Connection string** y copia el modo **Session pooler** (puerto `6543`) — se recomienda sobre la conexión directa para no agotar el límite de conexiones del plan gratuito.
+3. Ve a **Project Settings > Database > Connection string** y copia el modo **pooler** (puerto `6543`, "Transaction pooler") — se recomienda sobre la conexión directa para no agotar el límite de conexiones del plan gratuito.
+   ⚠️ El pooler de Supabase en modo transacción no soporta *prepared statements* del lado del servidor: la URL debe incluir `&prepareThreshold=0` (ver `.env.example`) o vas a ver errores intermitentes tipo `prepared statement "S_1" already exists`.
 
 ## 2. Configurar variables de entorno
 
@@ -39,8 +40,8 @@ Al iniciar, Flyway crea automáticamente el esquema (`src/main/resources/db/migr
 ## 4. Verificar
 
 - `GET http://localhost:8080/actuator/health` → debe responder `{"status":"UP"}` con el componente `db` en `UP`.
-- `GET http://localhost:8080/swagger-ui.html` → carga la UI de Swagger (aún sin endpoints de negocio).
-- En el dashboard de Supabase, **Table Editor**, deben aparecer las tablas: `cliente`, `cuenta`, `empresa_servicio`, `factura`, `pago`, `reversion`.
+- `GET http://localhost:8080/swagger-ui.html` → carga la UI de Swagger.
+- En el dashboard de Supabase, **Table Editor**, deben aparecer las tablas: `cliente`, `cuenta`, `empresa_servicio`, `factura`, `pago`, `reversion`, `servicio_inscrito`.
 
 ## Estructura del proyecto
 
@@ -58,4 +59,9 @@ com.umanizales.pagos
 
 ## Estado actual
 
-Este es el esqueleto inicial: entidades JPA + esquema de base de datos + seguridad básica. La lógica de negocio (repositorios, servicios, controladores REST) se implementa módulo por módulo en las siguientes iteraciones, empezando por el Módulo A (gestión de clientes y cuentas).
+- ✅ **Módulo A** (clientes, cuentas): registro/login JWT, perfil, vincular/listar/desvincular cuentas, saldo, movimientos.
+- ✅ **Módulo B** (facturas, servicios): inscribir/listar/editar/eliminar servicios públicos, consultar la factura vigente de cada uno (simulada vía `EmpresaServicioStubGateway` hasta que exista un proveedor real).
+- ⏳ Módulo C (pagos) y Módulo D (reversiones/auditoría): pendientes.
+- ⏳ Frontend React: pendiente.
+
+Tanto la integración con el Core Bancario como con las Empresas de Servicio son *stubs* (`CoreBancarioStubGateway`, `EmpresaServicioStubGateway`) que simulan respuestas OK mientras no exista una integración real.
