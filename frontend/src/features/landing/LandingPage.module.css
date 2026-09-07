@@ -4,6 +4,21 @@
   overflow-x: clip;
 }
 
+/* Copia local de la keyframe global (styles/global.css): dentro de un .module.css,
+   el bundler renombra las referencias de `animation:` como si fueran locales, y si el
+   @keyframes real solo existe en el archivo global el nombre queda sin resolver y la
+   animación nunca corre. Declararla aquí también hace que el renombrado sea consistente. */
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* --- navbar --- */
 .nav {
   position: sticky;
