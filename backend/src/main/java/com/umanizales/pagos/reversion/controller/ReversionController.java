@@ -60,10 +60,11 @@ public class ReversionController {
     @PatchMapping("/{reversionId}/decision")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<ReversionResponse> decidir(
+        @AuthenticationPrincipal AuthenticatedUser admin,
         @PathVariable UUID reversionId,
         @Valid @RequestBody DecidirReversionRequest request
     ) {
-        var reversion = reversionService.decidir(reversionId, request);
+        var reversion = reversionService.decidir(admin.clienteId(), reversionId, request);
         return ResponseEntity.ok(ReversionResponse.from(reversion));
     }
 }

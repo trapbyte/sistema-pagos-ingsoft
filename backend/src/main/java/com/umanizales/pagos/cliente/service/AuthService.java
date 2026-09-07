@@ -7,6 +7,7 @@ import com.umanizales.pagos.cliente.entity.Cliente;
 import com.umanizales.pagos.cliente.entity.EstadoCliente;
 import com.umanizales.pagos.cliente.entity.RolUsuario;
 import com.umanizales.pagos.cliente.repository.ClienteRepository;
+import com.umanizales.pagos.auditoria.service.AuditLogService;
 import com.umanizales.pagos.common.exception.DuplicateResourceException;
 import com.umanizales.pagos.common.exception.InvalidCredentialsException;
 import com.umanizales.pagos.config.security.JwtService;
@@ -20,11 +21,14 @@ public class AuthService {
     private final ClienteRepository clienteRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AuditLogService auditLogService;
 
-    public AuthService(ClienteRepository clienteRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(ClienteRepository clienteRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
+                        AuditLogService auditLogService) {
         this.clienteRepository = clienteRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -52,18 +56,24 @@ public class AuthService {
         return clienteRepository.save(cliente);
     }
 
+    @Transactional
     public LoginResponse login(LoginRequest request) {
-        Cliente cliente = clienteRepository.findByEmail(request.email())
-            .orElseThrow(() -> new InvalidCredentialsException("Credenciales inválidas"));
+        Cliente cliente = clienteRepository.findByEmail(request.email()).orElse(null);
 
-        if (cliente.getEstado() != EstadoCliente.ACTIVO) {
-            throw new InvalidCredentialsException("La cuenta se encuentra inactiva");
-        }
-        if (!passwordEncoder.matches(request.password(), cliente.getPasswordHash())) {
+        if (cliente == null || cliente.getEstado() != EstadoCliente.ACTIVO
+            || !passwordEncoder.matches(request.password(), cliente.getPasswordHash())) {
+            // Transacción propia: si se guardara en la misma transacción de este método,
+            // el rollback al lanzar la excepción de abajo borraría este mismo registro.
+            auditLogService.registrarEnNuevaTransaccion(
+                cliente != null ? cliente.getId() : null,
+                "LOGIN_FALLIDO", "Cliente", cliente != null ? cliente.getId() : null,
+                "Intento de login con el correo " + request.email());
             throw new InvalidCredentialsException("Credenciales inválidas");
         }
 
         JwtService.GeneratedToken generatedToken = jwtService.generarToken(cliente.getId(), cliente.getRol());
+        auditLogService.registrar(cliente.getId(), "LOGIN_EXITOSO", "Cliente", cliente.getId(), null);
+
         return new LoginResponse(generatedToken.token(), generatedToken.expiresAt());
     }
 }

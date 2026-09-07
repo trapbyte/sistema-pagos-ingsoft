@@ -1,13 +1,18 @@
 package com.umanizales.pagos.pago.controller;
 
+import com.umanizales.pagos.cliente.entity.TipoCuenta;
 import com.umanizales.pagos.common.security.AuthenticatedUser;
 import com.umanizales.pagos.pago.dto.ComprobanteResponse;
+import com.umanizales.pagos.pago.dto.FiltroHistorialPago;
 import com.umanizales.pagos.pago.dto.PagoResponse;
 import com.umanizales.pagos.pago.dto.RegistrarPagoLoteRequest;
 import com.umanizales.pagos.pago.dto.RegistrarPagoRequest;
+import com.umanizales.pagos.pago.entity.EstadoPago;
 import com.umanizales.pagos.pago.service.ComprobantePdfService;
+import com.umanizales.pagos.pago.service.HistorialPagoService;
 import com.umanizales.pagos.pago.service.PagoService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -19,8 +24,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,10 +39,13 @@ public class PagoController {
 
     private final PagoService pagoService;
     private final ComprobantePdfService comprobantePdfService;
+    private final HistorialPagoService historialPagoService;
 
-    public PagoController(PagoService pagoService, ComprobantePdfService comprobantePdfService) {
+    public PagoController(PagoService pagoService, ComprobantePdfService comprobantePdfService,
+                           HistorialPagoService historialPagoService) {
         this.pagoService = pagoService;
         this.comprobantePdfService = comprobantePdfService;
+        this.historialPagoService = historialPagoService;
     }
 
     @PostMapping
@@ -54,6 +66,49 @@ public class PagoController {
             .map(PagoResponse::from)
             .toList();
         return ResponseEntity.status(HttpStatus.CREATED).body(pagos);
+    }
+
+    @GetMapping("/historial")
+    public ResponseEntity<List<PagoResponse>> historial(
+        @AuthenticationPrincipal AuthenticatedUser user,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+        @RequestParam(required = false) UUID cuentaId,
+        @RequestParam(required = false) TipoCuenta tipoCuenta,
+        @RequestParam(required = false) UUID empresaId,
+        @RequestParam(required = false) EstadoPago estado,
+        @RequestParam(required = false) BigDecimal montoMinimo,
+        @RequestParam(required = false) BigDecimal montoMaximo
+    ) {
+        var filtro = new FiltroHistorialPago(fechaDesde, fechaHasta, cuentaId, tipoCuenta, empresaId, estado,
+            montoMinimo, montoMaximo);
+        var pagos = historialPagoService.buscar(user, filtro).stream()
+            .map(PagoResponse::from)
+            .toList();
+        return ResponseEntity.ok(pagos);
+    }
+
+    @GetMapping("/historial/exportar")
+    public ResponseEntity<byte[]> exportarHistorial(
+        @AuthenticationPrincipal AuthenticatedUser user,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+        @RequestParam(required = false) UUID cuentaId,
+        @RequestParam(required = false) TipoCuenta tipoCuenta,
+        @RequestParam(required = false) UUID empresaId,
+        @RequestParam(required = false) EstadoPago estado,
+        @RequestParam(required = false) BigDecimal montoMinimo,
+        @RequestParam(required = false) BigDecimal montoMaximo
+    ) {
+        var filtro = new FiltroHistorialPago(fechaDesde, fechaHasta, cuentaId, tipoCuenta, empresaId, estado,
+            montoMinimo, montoMaximo);
+        String csv = historialPagoService.exportarCsv(user, filtro);
+
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType("text/csv"))
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                ContentDisposition.attachment().filename("historial-pagos.csv").build().toString())
+            .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     @GetMapping("/{pagoId}")

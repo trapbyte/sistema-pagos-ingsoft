@@ -1,5 +1,6 @@
 package com.umanizales.pagos.reversion.service;
 
+import com.umanizales.pagos.auditoria.service.AuditLogService;
 import com.umanizales.pagos.cliente.entity.Cuenta;
 import com.umanizales.pagos.cliente.entity.RolUsuario;
 import com.umanizales.pagos.common.exception.BusinessRuleException;
@@ -41,14 +42,18 @@ class ReversionServiceTest {
     @Mock
     private PagoService pagoService;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     private ReversionService reversionService;
 
     private final UUID clienteId = UUID.randomUUID();
     private final UUID pagoId = UUID.randomUUID();
+    private final UUID administradorId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        reversionService = new ReversionService(reversionRepository, pagoService);
+        reversionService = new ReversionService(reversionRepository, pagoService, auditLogService);
     }
 
     private Pago pagoExitoso(Instant fechaHora) {
@@ -130,13 +135,15 @@ class ReversionServiceTest {
         Reversion reversion = reversionSolicitada(pago);
         when(reversionRepository.findByIdConPago(reversion.getId())).thenReturn(Optional.of(reversion));
 
-        var resultado = reversionService.decidir(reversion.getId(), new DecidirReversionRequest(true, "Procede"));
+        var resultado = reversionService.decidir(administradorId, reversion.getId(), new DecidirReversionRequest(true, "Procede"));
 
         assertThat(resultado.getEstado()).isEqualTo(EstadoReversion.EJECUTADA);
         assertThat(pago.getEstado()).isEqualTo(EstadoPago.REVERSADO);
         assertThat(pago.getCuenta().getSaldo()).isEqualByComparingTo("150.00");
         assertThat(pago.getFactura().getEstado()).isEqualTo(EstadoFactura.PENDIENTE);
         assertThat(resultado.getRespuestaAdministrador()).isEqualTo("Procede");
+        org.mockito.Mockito.verify(auditLogService).registrar(administradorId, "REVERSION_APROBADA",
+            "Reversion", reversion.getId(), "Procede");
     }
 
     @Test
@@ -145,7 +152,7 @@ class ReversionServiceTest {
         Reversion reversion = reversionSolicitada(pago);
         when(reversionRepository.findByIdConPago(reversion.getId())).thenReturn(Optional.of(reversion));
 
-        var resultado = reversionService.decidir(reversion.getId(), new DecidirReversionRequest(false, "No procede"));
+        var resultado = reversionService.decidir(administradorId, reversion.getId(), new DecidirReversionRequest(false, "No procede"));
 
         assertThat(resultado.getEstado()).isEqualTo(EstadoReversion.RECHAZADA);
         assertThat(pago.getEstado()).isEqualTo(EstadoPago.EXITOSO);
@@ -160,7 +167,7 @@ class ReversionServiceTest {
         when(reversionRepository.findByIdConPago(reversion.getId())).thenReturn(Optional.of(reversion));
 
         var request = new DecidirReversionRequest(true, "Procede");
-        assertThatThrownBy(() -> reversionService.decidir(reversion.getId(), request))
+        assertThatThrownBy(() -> reversionService.decidir(administradorId, reversion.getId(), request))
             .isInstanceOf(BusinessRuleException.class);
     }
 

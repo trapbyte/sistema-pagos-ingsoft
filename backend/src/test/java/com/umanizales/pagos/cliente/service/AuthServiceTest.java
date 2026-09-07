@@ -7,6 +7,7 @@ import com.umanizales.pagos.cliente.entity.Cliente;
 import com.umanizales.pagos.cliente.entity.EstadoCliente;
 import com.umanizales.pagos.cliente.entity.RolUsuario;
 import com.umanizales.pagos.cliente.repository.ClienteRepository;
+import com.umanizales.pagos.auditoria.service.AuditLogService;
 import com.umanizales.pagos.common.exception.DuplicateResourceException;
 import com.umanizales.pagos.common.exception.InvalidCredentialsException;
 import com.umanizales.pagos.config.security.JwtService;
@@ -39,11 +40,14 @@ class AuthServiceTest {
     @Mock
     private JwtService jwtService;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(clienteRepository, passwordEncoder, jwtService);
+        authService = new AuthService(clienteRepository, passwordEncoder, jwtService, auditLogService);
     }
 
     private RegistroClienteRequest registroValido() {
@@ -123,6 +127,20 @@ class AuthServiceTest {
 
         assertThat(response.token()).isEqualTo("token-jwt");
         assertThat(response.expiresAt()).isEqualTo(expiracion);
+        org.mockito.Mockito.verify(auditLogService).registrar(cliente.getId(), "LOGIN_EXITOSO", "Cliente", cliente.getId(), null);
+    }
+
+    @Test
+    void loginFallidoQuedaRegistradoEnAuditoria() {
+        when(clienteRepository.findByEmail("ana@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("ana@example.com", "Segura123")))
+            .isInstanceOf(InvalidCredentialsException.class);
+
+        org.mockito.Mockito.verify(auditLogService)
+            .registrarEnNuevaTransaccion(org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq("LOGIN_FALLIDO"), org.mockito.ArgumentMatchers.eq("Cliente"),
+                org.mockito.ArgumentMatchers.isNull(), anyString());
     }
 
     private Cliente clienteActivo() {

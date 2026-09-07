@@ -1,5 +1,7 @@
 package com.umanizales.pagos.pago.service;
 
+import com.umanizales.pagos.auditoria.service.AuditLogService;
+import com.umanizales.pagos.cliente.entity.Cliente;
 import com.umanizales.pagos.cliente.entity.Cuenta;
 import com.umanizales.pagos.cliente.service.CuentaService;
 import com.umanizales.pagos.common.exception.BusinessRuleException;
@@ -42,6 +44,9 @@ class PagoServiceTest {
     @Mock
     private CuentaService cuentaService;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     private PagoService pagoService;
 
     private final UUID clienteId = UUID.randomUUID();
@@ -49,12 +54,16 @@ class PagoServiceTest {
 
     @BeforeEach
     void setUp() {
-        pagoService = new PagoService(pagoRepository, facturaRepository, cuentaService);
+        pagoService = new PagoService(pagoRepository, facturaRepository, cuentaService, auditLogService);
     }
 
     private Cuenta cuentaConSaldo(String saldo) {
+        Cliente cliente = new Cliente();
+        cliente.setId(clienteId);
+
         Cuenta cuenta = new Cuenta();
         cuenta.setId(cuentaId);
+        cuenta.setCliente(cliente);
         cuenta.setNumeroCuenta("1234567890");
         cuenta.setSaldo(new BigDecimal(saldo));
         return cuenta;

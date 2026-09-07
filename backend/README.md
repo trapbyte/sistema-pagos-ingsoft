@@ -53,17 +53,20 @@ com.umanizales.pagos
 ├── common/      Clases base compartidas
 ├── cliente/     Módulo A: Cliente, Cuenta
 ├── factura/     Módulo B: EmpresaServicio, Factura
-├── pago/        Módulo C: Pago
-└── reversion/   Módulo D: Reversion
+├── pago/        Módulo C: Pago, Domiciliacion, historial/exportación
+├── reversion/   Módulo D: Reversion
+└── auditoria/   Módulo D: AuditLog (transversal, CU-36)
 ```
 
 ## Estado actual
 
+Los cuatro módulos del documento de especificación están implementados en el backend:
+
 - ✅ **Módulo A** (clientes, cuentas): registro/login JWT, perfil, vincular/listar/desvincular cuentas, saldo, movimientos.
 - ✅ **Módulo B** (facturas, servicios): inscribir/listar/editar/eliminar servicios públicos, consultar la factura vigente de cada uno (simulada vía `EmpresaServicioStubGateway` hasta que exista un proveedor real).
 - ✅ **Módulo C** (pagos): pago inmediato/parcial/lote, comprobante en JSON y PDF, domiciliación con ejecución batch diaria.
-- ✅ **Módulo D (parte 1)**: solicitud, consulta y aprobación/rechazo de reversiones de pago, con reintegro de fondos.
-- ⏳ Módulo D (parte 2 — historial/filtros/exportación/auditoría) y frontend React: pendientes.
+- ✅ **Módulo D**: solicitud/aprobación/rechazo de reversiones con reintegro de fondos, historial consolidado con filtros combinables, exportación a CSV y auditoría de operaciones críticas (login, pagos, reversiones).
+- ⏳ Frontend React: pendiente — es el siguiente bloque de trabajo.
 
 Tanto la integración con el Core Bancario como con las Empresas de Servicio son *stubs* (`CoreBancarioStubGateway`, `EmpresaServicioStubGateway`) que simulan respuestas OK mientras no exista una integración real.
 

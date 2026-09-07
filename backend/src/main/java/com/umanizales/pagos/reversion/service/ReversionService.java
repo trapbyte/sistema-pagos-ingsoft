@@ -1,5 +1,6 @@
 package com.umanizales.pagos.reversion.service;
 
+import com.umanizales.pagos.auditoria.service.AuditLogService;
 import com.umanizales.pagos.cliente.entity.Cuenta;
 import com.umanizales.pagos.cliente.entity.RolUsuario;
 import com.umanizales.pagos.common.exception.BusinessRuleException;
@@ -32,10 +33,13 @@ public class ReversionService {
 
     private final ReversionRepository reversionRepository;
     private final PagoService pagoService;
+    private final AuditLogService auditLogService;
 
-    public ReversionService(ReversionRepository reversionRepository, PagoService pagoService) {
+    public ReversionService(ReversionRepository reversionRepository, PagoService pagoService,
+                             AuditLogService auditLogService) {
         this.reversionRepository = reversionRepository;
         this.pagoService = pagoService;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -87,7 +91,7 @@ public class ReversionService {
      * ya que este sistema no tiene un proceso bancario asíncrono real.
      */
     @Transactional
-    public Reversion decidir(UUID reversionId, DecidirReversionRequest request) {
+    public Reversion decidir(UUID administradorId, UUID reversionId, DecidirReversionRequest request) {
         Reversion reversion = reversionRepository.findByIdConPago(reversionId)
             .orElseThrow(() -> new ResourceNotFoundException("Reversión no encontrada"));
 
@@ -97,11 +101,15 @@ public class ReversionService {
 
         reversion.setRespuestaAdministrador(request.respuesta());
 
-        if (Boolean.TRUE.equals(request.aprobar())) {
+        boolean aprobada = Boolean.TRUE.equals(request.aprobar());
+        if (aprobada) {
             aprobarYReintegrar(reversion);
         } else {
             reversion.setEstado(EstadoReversion.RECHAZADA);
         }
+
+        auditLogService.registrar(administradorId, aprobada ? "REVERSION_APROBADA" : "REVERSION_RECHAZADA",
+            "Reversion", reversion.getId(), request.respuesta());
 
         return reversion;
     }

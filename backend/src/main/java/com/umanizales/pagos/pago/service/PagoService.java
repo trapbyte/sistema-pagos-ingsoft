@@ -1,5 +1,6 @@
 package com.umanizales.pagos.pago.service;
 
+import com.umanizales.pagos.auditoria.service.AuditLogService;
 import com.umanizales.pagos.cliente.entity.Cuenta;
 import com.umanizales.pagos.cliente.service.CuentaService;
 import com.umanizales.pagos.common.MaskUtils;
@@ -30,12 +31,14 @@ public class PagoService {
     private final PagoRepository pagoRepository;
     private final FacturaRepository facturaRepository;
     private final CuentaService cuentaService;
+    private final AuditLogService auditLogService;
 
     public PagoService(PagoRepository pagoRepository, FacturaRepository facturaRepository,
-                        CuentaService cuentaService) {
+                        CuentaService cuentaService, AuditLogService auditLogService) {
         this.pagoRepository = pagoRepository;
         this.facturaRepository = facturaRepository;
         this.cuentaService = cuentaService;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -160,7 +163,10 @@ public class PagoService {
         pago.setTipoProcesamiento(tipo);
         pago.setFechaHora(Instant.now());
 
-        return pagoRepository.save(pago);
+        Pago guardado = pagoRepository.save(pago);
+        auditLogService.registrar(cuenta.getCliente().getId(), "PAGO_REGISTRADO", "Pago", guardado.getId(),
+            tipo + " - " + guardado.getCodigoComprobante() + " por $" + monto);
+        return guardado;
     }
 
     private String generarCodigoComprobante() {
