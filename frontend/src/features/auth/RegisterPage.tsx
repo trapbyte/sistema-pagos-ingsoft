@@ -24,7 +24,7 @@ export function RegisterPage() {
     setServerError(null);
     try {
       await registrar(data);
-      navigate("/", { replace: true });
+      navigate("/panel", { replace: true });
     } catch (err) {
       setServerError(err instanceof ApiRequestError ? err.message : "No pudimos crear tu cuenta. Intenta de nuevo.");
     }

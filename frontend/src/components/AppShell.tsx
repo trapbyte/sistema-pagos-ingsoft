@@ -5,7 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import styles from "./AppShell.module.css";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Inicio", icon: Home, end: true },
+  { to: "/panel", label: "Inicio", icon: Home, end: true },
   { to: "/servicios", label: "Servicios", icon: Zap },
   { to: "/pagar", label: "Pagar", icon: CreditCard },
   { to: "/historial", label: "Historial", icon: History },

@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "./auth/AuthContext";
+import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { AdminRoute, GuestRoute, ProtectedRoute } from "./auth/ProtectedRoute";
 import { ToastProvider } from "./components/Toast";
+import { LandingPage } from "./features/landing/LandingPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
@@ -18,6 +19,14 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
 
+/** "/" es pública (landing): a alguien ya logueado lo mandamos directo a su panel. */
+function RootRoute() {
+  const { session, loading } = useAuth();
+  if (loading) return null;
+  if (session) return <Navigate to="/panel" replace />;
+  return <LandingPage />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -25,13 +34,15 @@ export default function App() {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
+              <Route path="/" element={<RootRoute />} />
+
               <Route element={<GuestRoute />}>
                 <Route path="/ingresar" element={<LoginPage />} />
                 <Route path="/registrarse" element={<RegisterPage />} />
               </Route>
 
               <Route element={<ProtectedRoute />}>
-                <Route path="/" element={<DashboardPage />} />
+                <Route path="/panel" element={<DashboardPage />} />
                 <Route path="/servicios" element={<ServiciosPage />} />
                 <Route path="/pagar" element={<PagarPage />} />
                 <Route path="/historial" element={<HistorialPage />} />

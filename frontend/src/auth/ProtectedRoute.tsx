@@ -17,13 +17,13 @@ export function ProtectedRoute() {
 
 export function AdminRoute() {
   const { session } = useAuth();
-  if (session?.rol !== "ADMINISTRADOR") return <Navigate to="/" replace />;
+  if (session?.rol !== "ADMINISTRADOR") return <Navigate to="/panel" replace />;
   return <Outlet />;
 }
 
 export function GuestRoute() {
   const { session, loading } = useAuth();
   if (loading) return null;
-  if (session) return <Navigate to="/" replace />;
+  if (session) return <Navigate to="/panel" replace />;
   return <Outlet />;
 }

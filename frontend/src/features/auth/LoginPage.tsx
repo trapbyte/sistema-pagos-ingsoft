@@ -24,7 +24,7 @@ export function LoginPage() {
     setServerError(null);
     try {
       await login(data);
-      navigate("/", { replace: true });
+      navigate("/panel", { replace: true });
     } catch (err) {
       setServerError(err instanceof ApiRequestError ? err.message : "No pudimos iniciar sesión. Intenta de nuevo.");
     }
