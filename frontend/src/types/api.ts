@@ -70,6 +70,11 @@ export interface ActualizarPreferenciaCuentaRequest {
   predeterminada?: boolean | null;
 }
 
+/** Solo para desarrollo/pruebas — no existe en el documento de especificación. */
+export interface DepositoPruebaRequest {
+  monto: number;
+}
+
 export interface CuentaResponse {
   id: string;
   numeroCuentaEnmascarado: string;

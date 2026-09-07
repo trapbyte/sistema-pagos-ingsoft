@@ -3,6 +3,7 @@ import { api } from "../lib/apiClient";
 import type {
   ActualizarPreferenciaCuentaRequest,
   CuentaResponse,
+  DepositoPruebaRequest,
   PagoResumenResponse,
   VincularCuentaRequest,
 } from "../types/api";
@@ -34,6 +35,16 @@ export function useActualizarCuenta() {
   return useMutation({
     mutationFn: ({ cuentaId, data }: { cuentaId: string; data: ActualizarPreferenciaCuentaRequest }) =>
       api.patch<CuentaResponse>(`/api/cuentas/${cuentaId}/preferencias`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
+/** Solo para desarrollo/pruebas — no existe en el documento de especificación. */
+export function useDepositoPrueba() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cuentaId, data }: { cuentaId: string; data: DepositoPruebaRequest }) =>
+      api.post<CuentaResponse>(`/api/cuentas/${cuentaId}/deposito-prueba`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }

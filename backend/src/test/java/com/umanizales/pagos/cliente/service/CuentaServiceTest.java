@@ -1,5 +1,6 @@
 package com.umanizales.pagos.cliente.service;
 
+import com.umanizales.pagos.auditoria.service.AuditLogService;
 import com.umanizales.pagos.cliente.dto.ActualizarPreferenciaCuentaRequest;
 import com.umanizales.pagos.cliente.dto.VincularCuentaRequest;
 import com.umanizales.pagos.cliente.entity.Cliente;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,13 +43,17 @@ class CuentaServiceTest {
     @Mock
     private PagoRepository pagoRepository;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     private CuentaService cuentaService;
 
     private final UUID clienteId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        cuentaService = new CuentaService(cuentaRepository, clienteService, coreBancarioGateway, pagoRepository);
+        cuentaService = new CuentaService(cuentaRepository, clienteService, coreBancarioGateway, pagoRepository,
+            auditLogService);
     }
 
     private Cuenta nuevaCuenta(boolean predeterminada) {
@@ -133,5 +139,20 @@ class CuentaServiceTest {
 
         assertThat(resultado.isPredeterminada()).isTrue();
         assertThat(actualPredeterminada.isPredeterminada()).isFalse();
+    }
+
+    @Test
+    void depositoPruebaAcreditaSaldoYRegistraAuditoria() {
+        Cuenta cuenta = nuevaCuenta(true);
+        cuenta.setSaldo(BigDecimal.valueOf(100));
+        when(cuentaRepository.findByIdAndClienteId(cuenta.getId(), clienteId)).thenReturn(Optional.of(cuenta));
+
+        Cuenta resultado = cuentaService.depositoPrueba(clienteId, cuenta.getId(), BigDecimal.valueOf(50));
+
+        assertThat(resultado.getSaldo()).isEqualByComparingTo("150");
+        org.mockito.Mockito.verify(auditLogService)
+            .registrar(org.mockito.ArgumentMatchers.eq(clienteId), org.mockito.ArgumentMatchers.eq("DEPOSITO_PRUEBA"),
+                org.mockito.ArgumentMatchers.eq("Cuenta"), org.mockito.ArgumentMatchers.eq(cuenta.getId()),
+                org.mockito.ArgumentMatchers.anyString());
     }
 }

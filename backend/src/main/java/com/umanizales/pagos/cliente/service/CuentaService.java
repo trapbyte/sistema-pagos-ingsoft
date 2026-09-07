@@ -1,5 +1,6 @@
 package com.umanizales.pagos.cliente.service;
 
+import com.umanizales.pagos.auditoria.service.AuditLogService;
 import com.umanizales.pagos.cliente.dto.ActualizarPreferenciaCuentaRequest;
 import com.umanizales.pagos.cliente.dto.VincularCuentaRequest;
 import com.umanizales.pagos.cliente.entity.Cliente;
@@ -26,13 +27,16 @@ public class CuentaService {
     private final ClienteService clienteService;
     private final CoreBancarioGateway coreBancarioGateway;
     private final PagoRepository pagoRepository;
+    private final AuditLogService auditLogService;
 
     public CuentaService(CuentaRepository cuentaRepository, ClienteService clienteService,
-                          CoreBancarioGateway coreBancarioGateway, PagoRepository pagoRepository) {
+                          CoreBancarioGateway coreBancarioGateway, PagoRepository pagoRepository,
+                          AuditLogService auditLogService) {
         this.cuentaRepository = cuentaRepository;
         this.clienteService = clienteService;
         this.coreBancarioGateway = coreBancarioGateway;
         this.pagoRepository = pagoRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -105,6 +109,20 @@ public class CuentaService {
     public List<Pago> movimientos(UUID clienteId, UUID cuentaId) {
         Cuenta cuenta = obtenerDelCliente(clienteId, cuentaId);
         return pagoRepository.findByCuentaIdOrderByFechaHoraDesc(cuenta.getId());
+    }
+
+    /**
+     * Solo para desarrollo/pruebas: no hay caso de uso de depósito en el documento de
+     * especificación (el saldo real lo gestiona el Core Bancario, fuera de este sistema);
+     * esto existe únicamente para poder probar pagos en local sin acceso directo a la BD.
+     */
+    @Transactional
+    public Cuenta depositoPrueba(UUID clienteId, UUID cuentaId, BigDecimal monto) {
+        Cuenta cuenta = obtenerDelCliente(clienteId, cuentaId);
+        cuenta.acreditar(monto);
+        auditLogService.registrar(clienteId, "DEPOSITO_PRUEBA", "Cuenta", cuenta.getId(),
+            "Depósito de prueba por $" + monto);
+        return cuenta;
     }
 
     private void desmarcarPredeterminadaActual(UUID clienteId) {

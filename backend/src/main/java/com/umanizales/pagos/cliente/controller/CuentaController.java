@@ -2,6 +2,7 @@ package com.umanizales.pagos.cliente.controller;
 
 import com.umanizales.pagos.cliente.dto.ActualizarPreferenciaCuentaRequest;
 import com.umanizales.pagos.cliente.dto.CuentaResponse;
+import com.umanizales.pagos.cliente.dto.DepositoPruebaRequest;
 import com.umanizales.pagos.cliente.dto.VincularCuentaRequest;
 import com.umanizales.pagos.cliente.entity.Cuenta;
 import com.umanizales.pagos.cliente.service.CuentaService;
@@ -76,6 +77,22 @@ public class CuentaController {
         @PathVariable UUID cuentaId
     ) {
         return ResponseEntity.ok(cuentaService.obtenerDelCliente(user.clienteId(), cuentaId).getSaldo());
+    }
+
+    /**
+     * Solo para desarrollo/pruebas: acredita saldo directamente a la cuenta. No existe en
+     * el documento de especificación (el saldo real lo gestiona el Core Bancario, fuera de
+     * este sistema) — sirve para poder probar pagos en local sin acceso directo a la BD.
+     * TODO: quitar o proteger detrás de un perfil de Spring antes de cualquier despliegue real.
+     */
+    @PostMapping("/{cuentaId}/deposito-prueba")
+    public ResponseEntity<CuentaResponse> depositoPrueba(
+        @AuthenticationPrincipal AuthenticatedUser user,
+        @PathVariable UUID cuentaId,
+        @Valid @RequestBody DepositoPruebaRequest request
+    ) {
+        Cuenta cuenta = cuentaService.depositoPrueba(user.clienteId(), cuentaId, request.monto());
+        return ResponseEntity.ok(CuentaResponse.from(cuenta));
     }
 
     @GetMapping("/{cuentaId}/movimientos")

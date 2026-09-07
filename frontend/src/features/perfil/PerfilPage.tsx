@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, RotateCcw, ShieldCheck, Star, Trash2, Wallet, Zap } from "lucide-react";
+import { ChevronRight, FlaskConical, RotateCcw, ShieldCheck, Star, Trash2, Wallet, Zap } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/apiClient";
 import { formatMoney } from "../../lib/format";
 import { perfilSchema, vincularCuentaSchema, type PerfilForm, type VincularCuentaForm } from "../../lib/schemas";
-import { useActualizarCuenta, useCuentas, useDesvincularCuenta, useVincularCuenta } from "../../hooks/useCuentas";
+import { useActualizarCuenta, useCuentas, useDepositoPrueba, useDesvincularCuenta, useVincularCuenta } from "../../hooks/useCuentas";
 import { Section } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { InputField, SelectField } from "../../components/Field";
@@ -22,6 +22,7 @@ export function PerfilPage() {
   const navigate = useNavigate();
   const notify = useToast();
   const [modalVincular, setModalVincular] = useState(false);
+  const [cuentaADepositar, setCuentaADepositar] = useState<{ id: string; nombre: string } | null>(null);
   const { data: cuentas = [] } = useCuentas();
   const actualizarCuenta = useActualizarCuenta();
   const desvincular = useDesvincularCuenta();
@@ -111,6 +112,14 @@ export function PerfilPage() {
                     {cuenta.tipo === "AHORROS" ? "Ahorros" : "Corriente"} · {cuenta.numeroCuentaEnmascarado} · <span className="money">{formatMoney(cuenta.saldo)}</span>
                   </div>
                 </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  title="Agregar saldo de prueba (solo desarrollo)"
+                  onClick={() => setCuentaADepositar({ id: cuenta.id, nombre: cuenta.alias || cuenta.numeroCuentaEnmascarado })}
+                >
+                  <FlaskConical size={15} />
+                </Button>
                 <button type="button" className={`${styles.star} ${cuenta.predeterminada ? styles.active : ""}`} title="Predeterminada" onClick={() => marcarPredeterminada(cuenta.id)}>
                   <Star size={18} fill={cuenta.predeterminada ? "currentColor" : "none"} />
                 </button>
@@ -161,7 +170,47 @@ export function PerfilPage() {
       </Section>
 
       {modalVincular && <VincularCuentaModal onClose={() => setModalVincular(false)} />}
+      {cuentaADepositar && <DepositoPruebaModal cuenta={cuentaADepositar} onClose={() => setCuentaADepositar(null)} />}
     </div>
+  );
+}
+
+/**
+ * Solo para desarrollo/pruebas: no existe en el documento de especificación (el saldo
+ * real lo gestiona el Core Bancario). Permite probar pagos sin acceso directo a la BD.
+ */
+function DepositoPruebaModal({ cuenta, onClose }: { cuenta: { id: string; nombre: string }; onClose: () => void }) {
+  const depositar = useDepositoPrueba();
+  const notify = useToast();
+  const [monto, setMonto] = useState("100000");
+
+  const confirmar = async () => {
+    const valor = Number(monto);
+    if (!valor || valor <= 0) {
+      notify("Ingresa un monto válido", "error");
+      return;
+    }
+    try {
+      await depositar.mutateAsync({ cuentaId: cuenta.id, data: { monto: valor } });
+      notify(`Saldo de prueba agregado a ${cuenta.nombre}`, "success");
+      onClose();
+    } catch (err) {
+      notify(apiErrorMessage(err, "No pudimos agregar el saldo"), "error");
+    }
+  };
+
+  return (
+    <Modal title={`Saldo de prueba · ${cuenta.nombre}`} onClose={onClose}>
+      <div className={styles.form}>
+        <p style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+          Función solo de desarrollo: acredita saldo directamente para poder probar pagos. No existe en un banco real.
+        </p>
+        <InputField label="Monto a agregar" type="number" min={1} step={1000} value={monto} onChange={(e) => setMonto(e.target.value)} />
+        <Button variant="primary" full onClick={confirmar} loading={depositar.isPending}>
+          Agregar saldo
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
