@@ -3,6 +3,7 @@ package com.umanizales.pagos.cliente.dto;
 import com.umanizales.pagos.cliente.entity.Cuenta;
 import com.umanizales.pagos.cliente.entity.EstadoCuenta;
 import com.umanizales.pagos.cliente.entity.TipoCuenta;
+import com.umanizales.pagos.common.MaskUtils;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -19,20 +20,12 @@ public record CuentaResponse(
     public static CuentaResponse from(Cuenta cuenta) {
         return new CuentaResponse(
             cuenta.getId(),
-            enmascarar(cuenta.getNumeroCuenta()),
+            MaskUtils.enmascararNumero(cuenta.getNumeroCuenta()),
             cuenta.getTipo(),
             cuenta.getEstado(),
             cuenta.getAlias(),
             cuenta.isPredeterminada(),
             cuenta.getSaldo()
         );
-    }
-
-    private static String enmascarar(String numeroCuenta) {
-        if (numeroCuenta.length() <= 4) {
-            return numeroCuenta;
-        }
-        String ultimos4 = numeroCuenta.substring(numeroCuenta.length() - 4);
-        return "*".repeat(numeroCuenta.length() - 4) + ultimos4;
     }
 }

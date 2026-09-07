@@ -50,9 +50,27 @@ public class Factura extends Auditable {
     @Column(nullable = false)
     private EstadoFactura estado;
 
+    @Column(name = "monto_pagado", nullable = false)
+    private BigDecimal montoPagado = BigDecimal.ZERO;
+
     public boolean esVencida() {
         return estado != EstadoFactura.PAGADA
             && estado != EstadoFactura.ANULADA
             && fechaVencimiento.isBefore(LocalDate.now());
+    }
+
+    public BigDecimal saldoPendiente() {
+        return montoTotal.subtract(montoPagado);
+    }
+
+    /**
+     * Aplica un abono (CU-20/CU-21): acumula lo pagado y, si cubre el total,
+     * marca la factura como {@link EstadoFactura#PAGADA}.
+     */
+    public void marcarComoPagada(BigDecimal monto) {
+        this.montoPagado = this.montoPagado.add(monto);
+        if (this.montoPagado.compareTo(this.montoTotal) >= 0) {
+            this.estado = EstadoFactura.PAGADA;
+        }
     }
 }

@@ -34,4 +34,7 @@ public class EmpresaServicio extends Auditable {
 
     @Column(name = "endpoint_api")
     private String endpointApi;
+
+    @Column(name = "permite_pago_parcial", nullable = false)
+    private boolean permitePagoParcial = true;
 }

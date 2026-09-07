@@ -1,6 +1,7 @@
 package com.umanizales.pagos.cliente.entity;
 
 import com.umanizales.pagos.common.Auditable;
+import com.umanizales.pagos.common.exception.BusinessRuleException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -51,4 +52,23 @@ public class Cuenta extends Auditable {
 
     @Column(name = "es_predeterminada", nullable = false)
     private boolean predeterminada;
+
+    public boolean validarSaldo(BigDecimal monto) {
+        return saldo.compareTo(monto) >= 0;
+    }
+
+    /**
+     * CU-20/21/22: descuenta fondos de la cuenta. Lanza {@link BusinessRuleException}
+     * si el saldo no alcanza (FA01 de esos casos de uso).
+     */
+    public void debitar(BigDecimal monto) {
+        if (!validarSaldo(monto)) {
+            throw new BusinessRuleException("Saldo insuficiente en la cuenta " + numeroCuenta);
+        }
+        this.saldo = this.saldo.subtract(monto);
+    }
+
+    public void acreditar(BigDecimal monto) {
+        this.saldo = this.saldo.add(monto);
+    }
 }
